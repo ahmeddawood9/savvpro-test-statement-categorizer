@@ -8,6 +8,12 @@ by the developer, never by the AI. This file feeds `AI_USAGE.md` in the repo roo
 Entry times for the first three entries are taken from file modification times (the
 exploration entry has no file, so its time is only bounded).
 
+Token figures are measured, not estimated. They are summed from the `usage` fields that
+Claude Code saved in the session transcript (`~/.claude/projects/.../15d2b4d1-....jsonl`),
+for all model requests made while answering the prompt behind each entry. "Input (uncached)"
+is small because most input is served from the prompt cache; add the cache write and cache
+read figures to get the total input processed. Screenshots go in `docs/ai-usage/`.
+
 ### 2026-10-26 before 14:21 — Explore the repo (read-only)
 - **Asked:** Show the file tree, full TASK.md and every other file, git log/branches, and report on requirements and ambiguities. No changes allowed.
 - **Generated/changed:** None (read-only: `ls`, `cat`, `wc`, `git log`, `git branch -a`, `git remote -v`, `git status`).
@@ -19,7 +25,7 @@ exploration entry has no file, so its time is only bounded).
   - My claim that "grading has no rubric" is based only on what is in the repo. There may be criteria shared elsewhere (email, invite).
   - The deadline is not in the repo; I could not determine it.
 - **Developer review:** Read the repo exploration report. Decided to keep setup instructions in README.md and move the submission guide to docs/SUBMISSION_GUIDE.md. Confirmed scope constraints: CSV format only, rules engine (no ML), SQLite persistence with CSV export, and persistent merchant override rules.
-- **Tokens:** Input: 2,410 | Output: 850
+- **Tokens:** Input (uncached): 8 | Cache write: 2,940 | Cache read: 113,556 | Output: 4,288 | Model: Opus 5.5
 
 ### 2026-10-26 14:21 — Create CLAUDE.md and .gitignore
 - **Asked:** Create `CLAUDE.md` with the given content and a `.gitignore` covering Python, Node, env files, DBs, OS/editor files and `.claude/settings.local.json`.
@@ -32,7 +38,7 @@ exploration entry has no file, so its time is only bounded).
   - The `.gitignore` does not ignore `.claude/` as a whole, only `settings.local.json`, as asked.
   - `CLAUDE.md` says to create `README.md` in the root, but the existing `README.md` is the fork/submit guide. This conflict is still unresolved.
 - **Developer review:** Scaffolding look good. Verified that .claude/settings.local.json is properly ignored so local configurations don't leak into version control.
-- **Tokens:** Input: 1,850 | Output: 420
+- **Tokens:** Input (uncached): 8 | Cache write: 3,380 | Cache read: 136,043 | Output: 1,465 | Model: Opus 5.5
 
 ### 2026-10-26 14:24 — Generate fake sample data
 - **Asked:** Create fake statements for a Pakistani freelance developer: a card CSV, a bank CSV, a deliberately broken CSV, a ground-truth labels file and a README. No app code.
@@ -74,7 +80,7 @@ exploration entry has no file, so its time is only bounded).
   - I checked row counts and the bank B balances with a script. I did not check the content of the labels against the CSV rows line by line.
   - Possible mismatch in `bank_b_checking.csv` row 25: a second `FED ON CHARGES` is labeled "similar_not_duplicate", but its date and amount differ from row 8 only slightly.
 - **Developer review:** Renamed the UBER EATS case tag to specific_beats_generic to accurately test exact-merchant priority over generic rules. Identified withholding tax rows and flagged them to be extracted into a dedicated tax category rather than general expenses.
-- **Tokens:** Input: 4,120 | Output: 1,890
+- **Tokens:** Input (uncached): 8 | Cache write: 21,857 | Cache read: 166,435 | Output: 20,650 | Model: Opus 5.5
 
 ### 2026-10-26 14:35 — Add AI usage log rule and log file
 - **Asked:** Append a mandatory "AI usage log" section to `CLAUDE.md`, create `docs/ai-usage/log.md`, and backfill entries for the earlier tasks this session.
@@ -88,7 +94,7 @@ exploration entry has no file, so its time is only bounded).
   - The earlier entries may omit assumptions I did not notice I was making.
   - I did not touch `AI_USAGE.md`, which TASK.md requires at the repo root. It does not exist yet.
 - **Developer review:** Established logging format to track explicit assumptions and uncertainty across tasks for repo auditability.
-- **Tokens:** Input: 1,520 | Output: 380
+- **Tokens:** Input (uncached): 6 | Cache write: 6,464 | Cache read: 179,918 | Output: 4,912 | Model: Sonnet 5.5
 
 ### 2026-10-26 14:41 — Two label fixes and Tax Withheld category
 - **Asked:** Rename case_tag on bank_a row 15 to `specific_beats_generic`; relabel bank_b row 22 as `Tax Withheld,fee,false,withholding_tax` if adding that category, and add it to the CLAUDE.md categories.
@@ -102,7 +108,7 @@ exploration entry has no file, so its time is only bounded).
   - The kinds list in CLAUDE.md has no `tax` kind; I did not add one.
   - Earlier log entries still describe the old Needs Review label for this row (they are history, so I left them).
 - **Developer review:** Adjusted tax classification rules. Moved withholding tax out of generic fees into a dedicated category to ensure it's treated as an advance tax credit rather than a business operating expense.
-- **Tokens:** Input: 1,980 | Output: 540
+- **Tokens:** Input (uncached): 8 | Cache write: 2,379 | Cache read: 199,674 | Output: 1,897 | Model: Sonnet 5.5
 
 ### 2026-10-26 14:47 — Add `tax` kind
 - **Asked:** Add a sixth kind `tax`; relabel bank_b row 22 as `Tax Withheld,tax,false,withholding_tax`; tax rows get their own "Tax already paid" total; add `tax` to the kinds in CLAUDE.md.
@@ -115,7 +121,7 @@ exploration entry has no file, so its time is only bounded).
   - Whether tax rows should be excluded from the "total expenses" figure and from net income, or only shown separately. I wrote only what you said.
   - Whether a tax refund or reversal would be kind `refund` or `tax`. Not covered yet.
 - **Developer review:** Explicitly separated tax entries from income and expense calculations so they only aggregate under a dedicated tax section. Validated net sum logic for tax adjustments.
-- **Tokens:** Input: 2,150 | Output: 610
+- **Tokens:** Input (uncached): 6 | Cache write: 1,997 | Cache read: 138,360 | Output: 1,951 | Model: Sonnet 5.5
 
 ### 2026-10-26 14:52 — Add tax totals and tax-refund rules to DESIGN.md
 - **Asked:** Add two bullets (tax rows excluded from expenses and income; refund of withheld tax stays kind `tax`) to DESIGN.md section 2.
@@ -127,4 +133,35 @@ exploration entry has no file, so its time is only bounded).
   - The bullets answer the two questions I raised earlier. `sample_data` has no tax-refund example row, and `CLAUDE.md` does not yet mention these two rules.
   - Rule 6 in section 4 ("positive amount from a merchant on a card → refund") will need a guard so a positive Tax Withheld row is not read as a refund. I did not change it.
 - **Developer review:** Confirmed that DESIGN.md section 2 matches the underlying execution logic. Verified that positive tax adjustments are handled correctly without being mistaken for merchant refunds.
-- **Tokens:** Input: 1,450 | Output: 310
+- **Tokens:** Input (uncached): 10 | Cache write: 2,769 | Cache read: 287,477 | Output: 1,327 | Model: Sonnet 5.5
+
+### 2026-10-26 15:31 — Backend skeleton and ingest/parse layer
+- **Asked:** Set up the uv backend with a `/health` endpoint and build the CSV ingest layer (format profiles, parser, `parse_amount`) with tests. No normalizer, brain, database or frontend.
+- **Generated/changed:** `backend/pyproject.toml`, `backend/uv.lock`, `backend/.python-version`, `backend/app/main.py`, `backend/app/ingest/{formats,parser,amounts,models}.py`, empty `__init__.py` files, `backend/tests/{test_amounts,test_parser,test_health}.py`, `docs/ai-usage/log.md`.
+- **Assumptions I made:**
+  - **Extra dev dependency:** added `httpx` (the `/health` test needs it). It prints a deprecation warning from starlette's test client.
+  - **Where things live:** put `parse_amount` in `ingest/amounts.py` and the result types in `ingest/models.py`, as Pydantic models (the spec didn't say where).
+  - **Header detection:** it matches the header set by name and ignores order, so reordered columns still work. Names are stripped of whitespace.
+  - **Lines:** split on `\r\n`, `\n` or `\r`, and parse each physical line by itself. A quoted field can therefore not span two lines (it becomes an error). A malformed header raises `IngestError`.
+  - **Extra rules beyond the spec:**
+    - An empty description is a ParseError.
+    - An empty currency is a ParseError.
+    - A whitespace-only line counts as blank (skipped).
+    - Dates must round-trip exactly, so `2026-9-1` is rejected.
+    - A negative or parenthesised value in a Debit or Credit column is an error.
+    - `Balance` is never read or checked.
+  - **`parse_amount` choices:**
+    - One currency marker is allowed, at the start or end: `Rs`, `Rs.`, `PKR`, `USD`, `$` (case-insensitive).
+    - Commas must group digits in threes, so `1,23.00` and `1.234,56` are rejected. Spaces inside a number are rejected.
+    - `NaN`, exponents and more than one sign marker (`(-5)`, `-(5)`, `--5`) are rejected.
+    - It raises `AmountError`, a `ValueError` subclass.
+  - **Scope:** other currencies in the amount text (`EUR`, `£`) are not supported and will be errors.
+- **Unsure about / please check:**
+  - **Bug found and fixed in this task:** my first `parse_amount` stripped currency words and spaces anywhere, so `"1rs2"` parsed as 12 and `"5 USD 5"` as 55. I only found it by running the input after I had written the log. It now only strips a marker at one end, and those inputs are errors with tests.
+  - **Tests:** 166 pass and `ruff check` is clean. They passed on the first run before the fix above, which shows they were too lenient for odd input. The sign check is the only link to `expected_labels.csv`, so it doesn't prove categories.
+  - **Unusual input:** zero amounts parse as valid. I did not test other odd inputs, such as full-width digits or a Unicode minus sign.
+  - **Packaging:** the Python 3.12 pin comes from `.python-version` plus `requires-python`; I didn't check the CI plan yet.
+- **Developer review:** Fixed a regex bug in parse_amount where currency tokens ("1rs2", "5 USD 5") were stripped internally, violating strict parsing rules. Restricted currency stripping to strict leading/trailing edges and added negative test cases. Verified all 166 tests pass and ruff is clean.
+- **Tokens:** Input (uncached): 22 | Cache write: 22,766 | Cache read: 1,080,489 | Output: 20,918 | Model: Sonnet 5.5
+
+
