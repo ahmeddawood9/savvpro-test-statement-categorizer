@@ -33,8 +33,9 @@ README.md, DESIGN.md, AI_USAGE.md in repo root
 ## Categories
 Software & Subscriptions, Hosting & Cloud, Hardware & Equipment, Internet & Phone,
 Travel, Meals, Office Supplies, Professional Services, Bank Fees, Income, Transfer,
-Refund, Personal, Needs Review
-Kinds: expense, income, transfer, refund, fee
+Refund, Personal, Tax Withheld, Needs Review
+Kinds: expense, income, transfer, refund, fee, tax
+Summary: rows with kind `tax` get their own total ("Tax already paid"), separate from expenses.
 
 ## Working style
 - Small, focused changes. Explain what you changed and why after each task.
@@ -54,5 +55,5 @@ After completing ANY task, append an entry to docs/ai-usage/log.md in this forma
 
 Rules:
 - Never invent or estimate token counts. Leave the Tokens field for the developer.
-- Never fill in the Developer review field.
 - Be honest about assumptions and uncertainty. That section matters most.
+- Never fill in the Developer review field.
