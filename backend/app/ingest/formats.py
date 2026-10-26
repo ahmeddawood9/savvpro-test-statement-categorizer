@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
 
+from app.core.domain import AccountType
+
 
 class IngestError(ValueError):
     """The whole file cannot be read."""
@@ -18,6 +20,7 @@ class FormatProfile:
     description_column: str
     date_format: str
     amount_mode: Literal["signed", "debit_credit"]
+    account_type: AccountType
     amount_column: str | None = None
     debit_column: str | None = None
     credit_column: str | None = None
@@ -36,6 +39,7 @@ BANK_A_CARD = FormatProfile(
     description_column="Description",
     date_format="%Y-%m-%d",
     amount_mode="signed",
+    account_type="card",
     amount_column="Amount",
     currency_column="Currency",
 )
@@ -47,6 +51,7 @@ BANK_B_CHECKING = FormatProfile(
     description_column="Details",
     date_format="%d/%m/%Y",
     amount_mode="debit_credit",
+    account_type="bank",
     debit_column="Debit",
     credit_column="Credit",
     currency="PKR",

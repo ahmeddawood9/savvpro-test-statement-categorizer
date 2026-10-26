@@ -79,6 +79,7 @@ def test_bank_a_values() -> None:
     assert first.raw_description == "ADOBE CREATIVE CLOUD SAN JOSE CA"
     assert first.amount == Decimal("-59.99")
     assert first.currency == "USD"
+    assert first.account_type == "card"
 
 
 def test_bank_b_debit_credit_signs_and_currency() -> None:
@@ -86,6 +87,7 @@ def test_bank_b_debit_credit_signs_and_currency() -> None:
     assert rows[1].amount == Decimal("285400.00") and rows[1].date == date(2026, 9, 1)
     assert rows[2].amount == Decimal("-100000.00")
     assert all(r.currency == "PKR" for r in rows.values())
+    assert all(r.account_type == "bank" for r in rows.values())
 
 
 def test_messy_values_and_reasons() -> None:

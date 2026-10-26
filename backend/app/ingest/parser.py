@@ -79,6 +79,7 @@ def _parse_line(
         raw_description=description,
         amount=_row_amount(profile, cell),
         currency=_row_currency(profile, cell),
+        account_type=profile.account_type,
     )
 
 

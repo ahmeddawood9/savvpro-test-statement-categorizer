@@ -165,3 +165,27 @@ read figures to get the total input processed. Screenshots go in `docs/ai-usage/
 - **Tokens:** Input (uncached): 22 | Cache write: 22,766 | Cache read: 1,080,489 | Output: 20,918 | Model: Sonnet 5.5
 
 
+
+### 2026-10-26 15:57 — Normalizer, classification engine, duplicate post-check
+- **Asked:** Add `account_type` to the ingest layer; build the normalizer, the YAML rules schema (2 example rules per section only), the stage-ordered classifier and the duplicate post-check, with tests. No database, API or frontend.
+- **Generated/changed:** `backend/app/core/{domain,config}.py`, `backend/app/brain/{normalizer,rules,models,classifier,postcheck}.py`, `backend/app/brain/rules.yaml`, `backend/app/ingest/{formats,models,parser}.py` (account_type), `backend/app/main.py` (loads rules at startup), `backend/pyproject.toml` and `uv.lock` (pyyaml), `backend/tests/{test_normalizer,test_rules,test_classifier,test_postcheck,test_labels}.py`, `test_parser.py` and `test_health.py` (small additions), `docs/ai-usage/log.md`.
+- **Assumptions I made:**
+  - **Normalizer:** `text` has the processor prefix removed (the spec only said it is uppercased and collapsed). Rules and duplicates match on it, so `starts_with: JOES` works for `SQ *JOES CAFE`. Only one prefix is removed. `SQ*`, `SQ *` and `TST* ` all count.
+  - **Matching:** `contains` treats letters and digits as word characters, so `CAFE` does not match `CAFETERIA` but does match `JOES-CAFE`. `starts_with` is a plain prefix check with no word boundary, so `AWS` also matches `AWSOME`. Non-ASCII letters are not treated as word characters.
+  - **Rules file:** unknown keys and section names are errors (so typos fail loudly). Missing sections are allowed (empty). Rule ids must be unique across all sections. Patterns are uppercased and space-collapsed when matched.
+  - **Review section:** the rule's `category` is treated as a suggestion; the decision is always `Needs Review`. `category: Needs Review` means no suggestion.
+  - **Threshold:** a confidence of exactly 0.8 is trusted (only values below it are not). A low-confidence reason gets "(low confidence 0.75)" appended.
+  - **Keywords:** if several keyword rules agree on the category, the most confident one is used. Conflicting categories give `Needs Review`, confidence 0, rule_id = the matched ids joined with "+", and no suggestion.
+  - **Direction fallback:** rule_id `card_money_in`. It only runs if no rule of any stage matched.
+  - **Zero amount:** goes to `Needs Review` with kind `expense` (the spec did not cover it).
+  - **User rules:** key must match exactly, an empty key never matches. If the user's category is `Needs Review` the row is flagged.
+  - **Duplicates:** the reason is exactly "possible duplicate of row N", unless the row was already in review, in which case the original reason is added after a semicolon. The comparison uses the normalized text and the Decimal amount.
+  - **Plumbing:** `classify(row, user_rules=(), rules=None)` loads and caches the shipped rules when `rules` is omitted. The app loads `rules.yaml` at startup. Confidence values are floats (they are scores, not money). Constants live in `core/config.py` (not environment variables).
+- **Unsure about / please check:**
+  - **Keyword confidence vs labels:** keywords default to 0.75, below the 0.8 threshold, so every keyword match goes to review by default. `expected_labels.csv` expects several keyword rows (SKYLINE HOSTING, BLUE BIRD CAFE, STORMFIBER, ACCOUNTANTS) to be trusted. Those rules will need an explicit confidence of at least 0.8, or one of the two documents has to change. `DESIGN.md` says keywords land below the threshold on purpose.
+  - **Refunds need `direction: out`:** a merchant rule with no direction filter also matches a refund and classifies it as income (there is a test showing this). The Adobe refund only becomes a Refund because the example Adobe rule has `direction: out`. Every merchant and keyword rule probably needs it.
+  - **Label test status:** `test_labels` currently shows 44 mismatches and is marked xfail. 27 of the 71 label rows already pass. I did not check the 44 one by one beyond reading the table; they all say "no rule matched" or "low confidence".
+  - **Other limits:** the `regex` rule type is not guarded against slow patterns. Nothing tests the classifier with a user rule whose `kind` conflicts with the amount's sign.
+  - **Tests:** 283 pass, 1 xfail, ruff clean. The rules and classifier tests were written by me, so they check my reading of the spec.
+- **Developer review:** _(to be filled by Dawood: what was wrong, what he changed)_
+- **Tokens:** _(to be filled by Dawood from usage screenshot)_
