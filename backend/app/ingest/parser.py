@@ -4,6 +4,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 
+from app.core.money import MoneyError, to_minor
 from app.ingest.amounts import AmountError, parse_amount
 from app.ingest.formats import FormatProfile, IngestError, detect_profile
 from app.ingest.models import ParsedRow, ParseError, ParseResult
@@ -100,10 +101,13 @@ Cell = Callable[[str], str]
 def _row_amount(profile: FormatProfile, cell: Cell) -> Decimal:
     try:
         if profile.amount_mode == "signed":
-            return parse_amount(cell(profile.amount_column))
-        return _debit_credit_amount(cell(profile.debit_column), cell(profile.credit_column))
-    except AmountError as exc:
+            amount = parse_amount(cell(profile.amount_column))
+        else:
+            amount = _debit_credit_amount(cell(profile.debit_column), cell(profile.credit_column))
+        to_minor(amount)  # money is stored in minor units: refuse what cannot be stored exactly
+    except (AmountError, MoneyError) as exc:
         raise _RowError(str(exc)) from None
+    return amount
 
 
 def _debit_credit_amount(debit_text: str, credit_text: str) -> Decimal:

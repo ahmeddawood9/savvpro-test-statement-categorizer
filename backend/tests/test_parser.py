@@ -198,3 +198,9 @@ def test_whitespace_only_line_is_skipped_and_counted() -> None:
     result = parse((HEADER + "\n   \n2026-09-01,GITHUB,-4.00,USD\n").encode())
     assert result.skipped == [1, 2]
     assert [r.row_number for r in result.rows] == [3]
+
+
+def test_amount_with_more_than_two_decimals_is_an_error_not_a_rounding() -> None:
+    result = parse((HEADER + "2026-09-01,GITHUB,-4.005,USD\n").encode())
+    assert result.rows == []
+    assert "decimal places" in result.errors[0].reason

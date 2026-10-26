@@ -24,3 +24,13 @@ AccountType = Literal["card", "bank"]
 CATEGORIES: tuple[str, ...] = get_args(Category)
 KINDS: tuple[str, ...] = get_args(Kind)
 NEEDS_REVIEW: Category = "Needs Review"
+
+# When the user fixes a row and does not pick a kind, these categories imply one.
+# Any other category follows the sign: money out = expense, money in = income.
+DEFAULT_KIND_BY_CATEGORY: dict[str, Kind] = {
+    "Income": "income",
+    "Transfer": "transfer",
+    "Refund": "refund",
+    "Bank Fees": "fee",
+    "Tax Withheld": "tax",
+}

@@ -69,3 +69,5 @@ def detect_profile(header: list[str]) -> FormatProfile:
     raise UnsupportedFormatError(
         f"Unrecognised header row: {','.join(names)!r}. Supported formats: {supported}"
     )
+
+PROFILES_BY_NAME: dict[str, FormatProfile] = {p.name: p for p in PROFILES}
