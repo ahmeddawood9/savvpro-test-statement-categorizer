@@ -2,8 +2,8 @@
 
 A running log of AI-assisted work on this project (Claude Code). Each entry records what
 was asked, what was changed, the assumptions the AI made without being told, and what the
-developer should double-check. The **Developer review** and **Tokens** fields are filled in
-by the developer, never by the AI. This file feeds `AI_USAGE.md` in the repo root.
+developer should double-check. The **Developer review** and **Tokens** fields hold the developer's own
+wording. Where the AI typed text in, it was the developer's text. This file feeds `AI_USAGE.md` in the repo root.
 
 Entry times for the first three entries are taken from file modification times (the
 exploration entry has no file, so its time is only bounded).
@@ -120,7 +120,7 @@ read figures to get the total input processed. Screenshots go in `docs/ai-usage/
 - **Unsure about / please check:**
   - Whether tax rows should be excluded from the "total expenses" figure and from net income, or only shown separately. I wrote only what you said.
   - Whether a tax refund or reversal would be kind `refund` or `tax`. Not covered yet.
-- **Developer review:** Explicitly separated tax entries from income and expense calculations so they only aggregate under a dedicated tax section. Validated net sum logic for tax adjustments.
+- **Developer review:** Decided to add a tax kind, because withholding tax is an advance tax credit, not a business expense. Only labels and docs changed here; the totals logic came later.
 - **Tokens:** Input (uncached): 6 | Cache write: 1,997 | Cache read: 138,360 | Output: 1,951 | Model: Sonnet 5.5
 
 ### 2026-10-26 14:52 — Add tax totals and tax-refund rules to DESIGN.md
@@ -132,7 +132,7 @@ read figures to get the total input processed. Screenshots go in `docs/ai-usage/
 - **Unsure about / please check:**
   - The bullets answer the two questions I raised earlier. `sample_data` has no tax-refund example row, and `CLAUDE.md` does not yet mention these two rules.
   - Rule 6 in section 4 ("positive amount from a merchant on a card → refund") will need a guard so a positive Tax Withheld row is not read as a refund. I did not change it.
-- **Developer review:** Confirmed that DESIGN.md section 2 matches the underlying execution logic. Verified that positive tax adjustments are handled correctly without being mistaken for merchant refunds.
+- **Developer review:** Added the two tax bullets to DESIGN.md section 2. Nothing was built yet, so nothing was verified against code.
 - **Tokens:** Input (uncached): 10 | Cache write: 2,769 | Cache read: 287,477 | Output: 1,327 | Model: Sonnet 5.5
 
 ### 2026-10-26 15:31 — Backend skeleton and ingest/parse layer
@@ -161,7 +161,7 @@ read figures to get the total input processed. Screenshots go in `docs/ai-usage/
   - **Tests:** 166 pass and `ruff check` is clean. They passed on the first run before the fix above, which shows they were too lenient for odd input. The sign check is the only link to `expected_labels.csv`, so it doesn't prove categories.
   - **Unusual input:** zero amounts parse as valid. I did not test other odd inputs, such as full-width digits or a Unicode minus sign.
   - **Packaging:** the Python 3.12 pin comes from `.python-version` plus `requires-python`; I didn't check the CI plan yet.
-- **Developer review:** Fixed a regex bug in parse_amount where currency tokens ("1rs2", "5 USD 5") were stripped internally, violating strict parsing rules. Restricted currency stripping to strict leading/trailing edges and added negative test cases. Verified all 166 tests pass and ruff is clean.
+- **Developer review:** Claude's first parse_amount stripped currency words and spaces anywhere (1rs2 parsed as 12). Claude caught it and fixed it by restricting currency stripping to the leading/trailing edges and adding negative test cases. All 166 tests passed and ruff was clean.
 - **Tokens:** Input (uncached): 22 | Cache write: 22,766 | Cache read: 1,080,489 | Output: 20,918 | Model: Sonnet 5.5
 
 
@@ -187,22 +187,22 @@ read figures to get the total input processed. Screenshots go in `docs/ai-usage/
   - **Label test status:** `test_labels` currently shows 44 mismatches and is marked xfail. 27 of the 71 label rows already pass. I did not check the 44 one by one beyond reading the table; they all say "no rule matched" or "low confidence".
   - **Other limits:** the `regex` rule type is not guarded against slow patterns. Nothing tests the classifier with a user rule whose `kind` conflicts with the amount's sign.
   - **Tests:** 283 pass, 1 xfail, ruff clean. The rules and classifier tests were written by me, so they check my reading of the spec.
-- **Developer review:** _(to be filled by Dawood: what was wrong, what he changed)_
-- **Tokens:** _(to be filled by Dawood from usage screenshot)_
+- **Developer review:** The engine itself was fine, but the two warnings above were real, so I dealt with them in the rules file rather than the code. I kept the 0.75 keyword default, since keywords should only suggest by default, and gave the few keyword rules the labels rely on (CAFE, COMPUTERS, STATIONERS, HOSTING) an explicit 0.85. I also made sure every merchant rule has `direction: out` and moved refunds and reversals up into the structural section, so money coming back can never be counted as income. The 44 failing labels were expected at this point, because the shipped rules.yaml only had two example rules per section.
+- **Tokens:** Input (uncached): 26 | Cache write: 48,220 | Cache read: 2,031,872 | Output: 41,811 | Model: Sonnet 5.5
 
 ### 2026-10-26 17:00 — Verify the developer's rules.yaml against the labels
 - **Asked:** Run the label test on the developer's own `rules.yaml`, fix any mismatches in the rules only, remove the xfail when clean, run the full suite, and report rules that can never fire or that match too broadly (findings only).
 - **Generated/changed:** `backend/tests/test_labels.py` (removed the xfail marker), `docs/ai-usage/log.md`. `rules.yaml`, `expected_labels.csv` and the engine were not touched.
 - **Assumptions I made:**
-  - **Provenance of `rules.yaml` (per Dawood):** the first draft was generated by an AI tool in a separate session, then reviewed and corrected by Dawood (invalid categories, refund placement, savings regex, accountants rule, keyword confidences). I did not see that draft or those corrections, and I did not write the file.
+  - **Provenance of `rules.yaml` (per Dawood):** the rule set was designed by Dawood and produced by Claude Code from his design. This session's transcript shows my 15:57 version (the rule format and two example rules per section) and my three changes at 17:03. The longer rule set was already in the file when this task started. *(Earlier wording of this bullet gave a different provenance and was wrong. It has been corrected.)*
   - **Nothing needed fixing:** `test_labels` already showed 0 mismatches, so I made no rule changes. The xfail was the only edit.
   - **How I checked "can never fire":** I probed each `contains` and `starts_with` phrase through the classifier on card/bank and money in/out, and I tried about 45 hand-written descriptions for regex alternatives and short words. This is a sample, not a proof, so other problem cases may exist.
 - **Unsure about / please check:**
   - **The label test only covers the sample rows.** 33 of the 76 rules decided no sample row (for example `fiverr_*`, `figma`, `slack`, `openai`, `anthropic`, `aws_full`, `indrive`, `lodging`, `mobile_wallets`, `wise_outgoing`, `cash_deposit`, `atm_withdrawal`, `card_autopay`, `card_interest`, `intl_txn_fee`, `payoneer_fee`, `bank_profit` and most keyword rules). They load and parse, but no test shows they behave as intended.
   - **Findings listed in the final report:** shadowed rule alternatives, short or broad words (`REV`, `PIA`, `SHELL`, `PSO`, `RAILWAY`, `ZOOM`, `UBER`, `AWS`, `MOBILES`) and income rules with no `account_type: bank`. I did not change any of them.
   - **Tests:** 284 pass, 0 xfail, ruff clean.
-- **Developer review:** _(to be filled by Dawood: what was wrong, what he changed)_
-- **Tokens:** _(to be filled by Dawood from usage screenshot)_
+- **Developer review:** Good to see the label test go fully green on my corrected rules without any changes, but I agree that only proves the sample rows, not all 76 rules. I read through the findings and sorted them by risk. Three could put a row in the wrong place without anyone noticing: income rules that also fire on a card statement, the bare `REV` in the reversal rule, and `RAILWAY` matching anything with that word in it. I fixed those in the next task. The rest I'm leaving as known limits for now and will write them up in DESIGN.md.
+- **Tokens:** Input (uncached): 14 | Cache write: 26,681 | Cache read: 1,202,062 | Output: 15,387 | Model: Sonnet 5.5
 
 ### 2026-10-26 17:03 — Three rules.yaml fixes with regression tests
 - **Asked:** Make exactly three changes to the developer's `rules.yaml` (bank-only income rules, drop bare `REV`, `RAILWAY` to `RAILWAY\.APP`) and add one test per change.
@@ -219,5 +219,230 @@ read figures to get the total input processed. Screenshots go in `docs/ai-usage/
     - Untested: 33 of 76 rules decided no sample row.
     - Keywords `kw_software`, `kw_subscription`, `kw_restaurant`, `kw_hotel`, `kw_airline`, `kw_fuel` stay at 0.75, so they only suggest a category.
   - **Tests:** 287 pass, ruff clean.
-- **Developer review:** _(to be filled by Dawood: what was wrong, what he changed)_
+- **Developer review:** Checked the diff and it's only the three changes I asked for, nothing else in rules.yaml was touched. I liked that each test has a control case and that the tests were run against the old rules first to prove they actually catch the bug. `REV CHARGE ADJ` now going to Needs Review is the behaviour I want: if the app can't tell what it is, it should ask instead of guessing.
+- **Tokens:** Input (uncached): 14 | Cache write: 6,092 | Cache read: 1,330,627 | Output: 5,132 | Model: Sonnet 5.5
+
+### 2026-10-26 17:15 — Bring DESIGN.md up to date and design the next phase
+- **Asked:** Set up DESIGN.md first, so the next steps (storage, API, totals) rest on written decisions.
+- **Generated/changed:** `DESIGN.md` (rewritten, existing structure and wording kept where still true), `docs/ai-usage/log.md`.
+- **Assumptions I made:**
+  - **Updated stale text:** the brain order now matches the built classifier and the developer's `rules.yaml`. The accountants rule is a merchant rule, refunds are structural, merchant rules carry `direction: out`, and keywords default to 0.75, below the threshold.
+  - **Messy-data table:** filled in from the real test names, which I listed with grep.
+  - **Sections 8 and 9 are my proposals, marked "planned", not decisions you made:**
+    - The SQLite tables, amounts stored as text, and the brain's decision kept apart from the user's fix.
+    - The five endpoints, and a kind that defaults from the chosen category.
+    - No login, user rules global to the database.
+    - Totals are per currency with no FX conversion, and Personal is excluded from business expenses.
+    - Refunds are shown separately and netted against expenses, and Needs Review rows stay out of all totals.
+    - Transfers are only counted.
+  - **Wording:** I wrote it in the first person ("my code") like the existing text. Section 10 says 33 of 76 rules lack a sample row, which is true today and will go stale.
+- **Unsure about / please check:**
+  - The tax treatments in section 9 are my reading, not tax advice: netting refunds against expenses, treating fees as business expenses, excluding Personal, and "Tax already paid" as the net of tax rows.
+  - Section 11 lists "a test for every rule", which is a goal, not something started.
+  - Nothing in sections 8-9 is built or tested.
+- **Developer review:** Mechanical update. Nothing of mine to add beyond the points the entry already flags under "Unsure about".
+- **Tokens:** Input (uncached): 12 | Cache write: 14,069 | Cache read: 1,160,489 | Output: 11,814 | Model: Sonnet 5.5
+
+### 2026-10-26 17:24 — Fill measured token counts for the newer log entries
+- **Asked:** Fill the Tokens fields that were still empty, from this session.
+- **Generated/changed:** `docs/ai-usage/log.md` (Tokens line on the 15:57, 17:00, 17:03 and 17:15 entries, plus this entry).
+- **Assumptions I made:**
+  - **Source and method:** same as before. I summed the `usage` fields in the session transcript, counting each model request once, and matched each log entry to the prompt that produced it.
+  - **Mapping:** the 15:57 entry is the normalizer/classifier prompt, 17:00 is the rules check, 17:03 the three fixes and 17:15 the DESIGN.md update.
+  - **Model:** all four were Sonnet 5.5.
+- **Unsure about / please check:**
+  - **No screenshot check:** these figures have not been compared with `/cost` or a usage screenshot.
+  - **Times:** the entry headings show times by my clock, which differ a little from the real prompt times (for example the 15:57 entry came from a prompt at 15:52).
+  - **Untracked turns:** several turns have no entry, so their tokens are in no entry. These include the push and git-state checks, the "what we did so far" summary and the log check.
+- **Developer review:** Mechanical task. Nothing of mine to add beyond the points the entry already flags under "Unsure about".
+- **Tokens:** Input (uncached): 8 | Cache write: 4,915 | Cache read: 750,257 | Output: 3,418 | Model: Sonnet 5.5
+
+### 2026-10-26 17:34 — Persistence and REST API
+- **Asked:** Add SQLite persistence (SQLAlchemy 2.0), a service layer and the REST API for upload, list, detail, summary, export, correction and categories, with settings from environment variables and tests on a temporary database. No frontend.
+- **Generated/changed:** `backend/app/core/{settings,money}.py`, `backend/app/core/domain.py` (default kind per category), `backend/app/{db,models,schemas}.py`, `backend/app/services/{statements,corrections,summary,export,errors}.py`, `backend/app/api/{deps,errors,meta,router,statements,transactions}.py`, `backend/app/main.py` (CORS, routers, startup creates tables), `backend/.env.example`, `backend/app/ingest/{formats,parser}.py` (small changes, see below), `backend/pyproject.toml` and `uv.lock` (sqlalchemy, pydantic-settings, python-multipart), tests `conftest.py`, `test_money.py`, `test_settings.py`, `test_api_statements.py`, `test_api_transactions.py`, `test_api_summary_export.py`, one test added to `test_parser.py`, `docs/ai-usage/log.md`.
+- **Assumptions I made:**
+  - **Extra column:** `statements.skipped_count`. The spec's column list has no place for the number of blank lines, and the detail endpoint must return it.
+  - **Parser change:** the parser now rejects an amount with more than 2 decimal places ("amount has more than 2 decimal places") instead of the service failing later. That way the error keeps its raw line, and money in minor units is always exact. Nothing is rounded.
+  - **Kind when you fix a row without giving one:** Income, Transfer, Refund, Bank Fees and Tax Withheld imply income, transfer, refund, fee and tax. Any other category follows the sign (money out = expense). The spec only said "kind if given"; I added this because otherwise a row fixed to Transfer would count as an expense. A given kind always wins.
+  - **Correction details:** confidence is set to 1.0 and the suggested category is cleared. "Needs Review" is not accepted as a correction (422). `remember` stores a kind on the user rule only when you gave one or the category implies one.
+  - **Re-classify after remember:** it covers every row with the same merchant key in every statement, except rows you fixed by hand. It re-runs the duplicate check for those rows' statements, so a "possible duplicate" flag is not lost. `reclassified_count` in the response counts rows that actually changed.
+  - **Summary:**
+    - Spending, fees and tax already paid are positive numbers; income and refunds are positive too.
+    - Rows still needing review are left out of every total except the separate `needs_review` block (count, total out, total in), so unreviewed money is never counted as spending.
+    - Personal is not separated from expenses and refunds are not netted against them. I built what the spec listed, not the proposals in DESIGN.md sections 8-9.
+    - Transfers show count, total out and total in.
+  - **Export:** columns are Date, Description, Amount, Currency, Category, Kind, Confidence, Needs Review, Reason. For the bank file the original Debit/Credit/Balance columns are not stored, so the export has one signed Amount column. Text that starts with `=`, `+`, `-`, `@` is prefixed with an apostrophe in the Description cell so a spreadsheet cannot run it as a formula. This does change the exported description, not the stored one.
+  - **HTTP details:** `/health` stays at the root (no `/api` prefix). Upload size is checked after the file is received (the limit protects the parser and the database, not the network). Unknown ids are 404, an empty merchant key with remember is 422, a missing file is 422 (FastAPI). The 422 body from request validation is a list, while ours is a string. File names have any directory part removed and are stored as `filename`.
+  - **Tests:** conftest points `DATABASE_URL` at a throwaway directory, and each API test uses its own temporary SQLite database through a dependency override. Nothing writes to `backend/data/`.
+- **Unsure about / please check:**
+  - **DESIGN.md is now out of date:** sections 8-9 use other endpoint names (`/rows/{n}`, `export.csv`), say Personal is excluded from expenses and that refunds are netted. None of that matches the code yet.
+  - **No concurrency or auth:** one user, no locking. Two simultaneous "remember" requests could race.
+  - **Money:** every currency is assumed to have 2 decimal places. A currency with 0 or 3 (JPY, KWD) would be stored wrongly. The sample data only has PKR and USD.
+  - **Schema changes:** tables are created with `create_all`, so a later column change will not migrate an existing database. Alembic is the noted next step.
+  - **Not tested:** upload at exactly the size limit, concurrent requests, a database that already exists with an older schema.
+  - **Tests:** 371 pass, ruff clean. I also ran the real server on a temporary database and called each endpoint with curl.
+- **Developer review:** I wrote the full spec for this one. Claude added three things I hadn't specified: a skipped_count column, a default kind when I fix a row, and leaving unreviewed rows out of the totals. I asked for DESIGN.md to be updated to match.
+- **Tokens:** Input (uncached): 30 | Cache write: 61,096 | Cache read: 4,104,009 | Output: 56,114 | Model: Sonnet 5.5
+
+### 2026-10-26 17:42 — Update DESIGN.md to match the code
+- **Asked:** Update DESIGN.md so it matches what the persistence and API task built.
+- **Generated/changed:** `DESIGN.md` (status line, section 7 status, sections 8 and 9 rewritten from "planned" to what is built, extra limits in section 10, section 11), `docs/ai-usage/log.md`.
+- **Assumptions I made:**
+  - I described the code as it is, not as the earlier proposal was. Differences from the earlier text: endpoint names, amounts stored as integer minor units (not text), `skipped_count` on statements, a manual fix overwrites the decision on its row (the original brain answer is not kept), fees reported separately from expenses.
+  - Personal and refund netting are described as **open decisions, not built**. The earlier proposal said Personal is excluded from expenses and refunds are netted; the code does neither.
+  - I added the new limits found in the last task to section 10 (2-decimal currencies, `create_all`, no auth or locking, upload size checked after receipt, bank export loses Debit/Credit/Balance).
+- **Unsure about / please check:**
+  - I checked the new text against the code and the API tests by reading them, not by an automated check, so a detail may still be off.
+  - Sections 1-6 are unchanged and I did not re-verify them in this task.
+- **Developer review:** Mechanical update to match the code. Nothing of mine to add beyond the points the entry already flags under "Unsure about".
+- **Tokens:** Input (uncached): 10 | Cache write: 6,519 | Cache read: 1,282,690 | Output: 5,312 | Model: Sonnet 5.5
+
+### 2026-10-26 17:45 — Keep Personal out of expenses in the summary
+- **Asked:** Rows with category Personal must not count in `expenses` or `expenses_by_category`. Add a per-currency `personal` block {count, total}, plus a test on the bank_a_card summary.
+- **Generated/changed:** `backend/app/services/summary.py`, `backend/app/schemas.py` (`personal` field), `backend/tests/test_api_summary_export.py` (2 new tests, 1 extra assertion), `DESIGN.md` (section 9, status line, section 11), `docs/ai-usage/log.md`.
+- **Assumptions I made:**
+  - A row in category Personal goes to `personal` whatever its kind (expense, fee, income...). The spec only talked about expenses; this way a Personal row can never end up in fees or income.
+  - `personal.total` is a positive amount (money spent), like `expenses`.
+  - A Personal row that still needs review stays in the `needs_review` block, like every other row, until it is confirmed.
+  - I added a second test (fixing a review row to Personal moves it into `personal` and leaves `expenses` unchanged) and updated DESIGN.md section 9, neither of which was requested.
+- **Unsure about / please check:**
+  - The bank_a_card numbers in the test come from the current rules: PKR expenses 85,395.00 over 10 rows (checked by hand against the CSV), Netflix 1,100.00 in `personal`. A change to the rules could change them.
+  - The API response gained a field (`personal`), so any client written earlier would need it.
+  - Tests: 373 pass, ruff clean.
+- **Developer review:** My decision. Claude raised it as an open question and I chose to keep Personal rows out of expenses and show them in their own block.
+- **Tokens:** Input (uncached): 10 | Cache write: 5,033 | Cache read: 1,310,091 | Output: 5,071 | Model: Sonnet 5.5
+
+### 2026-10-26 18:35 — Frontend (Vite, React, TypeScript)
+- **Asked:** Build the one-page review UI in `/frontend`: upload, statement list, counts, per-currency summary, filterable transactions table with a row editor ("Remember for this merchant"), parse errors, CSV download, loading and empty states, with Vitest + React Testing Library tests and a Vite dev proxy. Backend unchanged.
+- **Generated/changed:** everything under `frontend/` (scaffolded with `npm create vite`, then `src/api/client.ts`, `src/format.ts`, `src/useStatement.ts`, `src/App.tsx`, `src/components/{UploadPanel,StatementList,CountsBar,SummaryPanel,TransactionsTable,ReviewEditor,ParseErrorsPanel}.tsx`, `src/index.css`, `vite.config.ts`, `.env.example`, test files and `src/test/{setup,mockApi,fixtures}.ts`), `docs/ai-usage/log.md`. The backend was not touched.
+- **Assumptions I made:**
+  - **Linter:** the current Vite template ships **oxlint**, not ESLint, so I kept oxlint as "the linter from the template". `npm run lint` runs it.
+  - **Template leftovers removed:** the sample assets, `App.css`, `public/icons.svg` and the template's `README.md`. I set `"strict": true` explicitly in `tsconfig.app.json`.
+  - **Extra files not in your structure list:** `CountsBar.tsx` (the counts bar), `useStatement.ts` (loads a statement and its summary), `format.ts` (display helpers), `src/test/*` (test helpers).
+  - **Display:** amounts are formatted from the string with thousands commas (no numbers involved) and shown with the currency code. Dates show as "1 Sep 2026". The download is a plain link to `/api/statements/{id}/export` styled as a button (a link is the correct element for a download).
+  - **Counts bar:** "auto-categorized" means a row that needs no review and was not fixed by hand.
+  - **Editor:** opens from a Fix button on review rows and an Edit button on every other row. It starts on the suggested category when there is one. The kind defaults to "Automatic" and is only sent when chosen, so the API's own rule applies. The remember checkbox is disabled, with a tooltip and visible hint, when `merchant_key` is empty, and `remember` is never sent as true then.
+  - **After a save:** it shows "Saved." or "Saved. N other rows updated.", then fetches the statement, summary and list again.
+  - **Filters** are buttons with `aria-pressed`, not ARIA tabs (tabs need arrow-key handling I did not build). They reset when another statement is opened.
+  - **Dev server:** `/api` and `/health` are proxied to `http://localhost:8000`. `VITE_API_URL` is empty by default.
+  - **Tests:** `fetch` is mocked, so they do not touch the backend. I also ran both real servers and called the API through the Vite proxy with curl (page, health, upload, summary, export).
+- **Unsure about / please check:**
+  - **I could not look at the page.** I did not open a browser or take screenshots, so layout, colours, the dark theme and narrow-width behaviour are untested by eye. Please open it and check.
+  - **Accessibility is partly checked:** labels, roles and keyboard use are tested, but I did not run a screen reader or an automated audit.
+  - **Failed refresh:** if the refresh after a successful save fails, the old data stays on screen with no message.
+  - **Stale list:** the statement list is only refreshed on load, upload and save.
+  - **A wrong test assumption:** my first keyboard test expected Enter on a select box to submit the form, which browsers do not do. I changed the test to tab to Save and press Enter.
+  - **Results:** 50 frontend tests pass, build and lint clean, backend 373 tests still pass.
+- **Developer review:** I specified the structure, the editor and the tests. Claude's first keyboard test was wrong (Enter on a select doesn't submit). It never looked at the page itself. oxlint replaced ESLint because the Vite template ships it.
+- **Tokens:** Input (uncached): 30 | Cache write: 57,587 | Cache read: 5,005,960 | Output: 53,047 | Model: Sonnet 5.5
+
+### 2026-10-26 18:41 — Three UI polish fixes
+- **Asked:** (1) show "—" with an explaining tooltip instead of the confidence number on rows that need review; (2) in the Transfers and Unreviewed cards show "In: X" and "Out: Y" on separate lines with the note on its own line below; (3) dim summary cards that have 0 rows instead of hiding them. Frontend only.
+- **Generated/changed:** `frontend/src/components/TransactionsTable.tsx`, `frontend/src/components/SummaryPanel.tsx`, `frontend/src/index.css`, `frontend/src/components/TransactionsTable.test.tsx`, `frontend/src/components/SummaryPanel.test.tsx`, `docs/ai-usage/log.md`. The backend was not touched.
+- **Assumptions I made:**
+  - **Tooltip:** the dash has a `title` explaining the number belongs to the rule that flagged the row. I also added visually hidden text ("not shown, this row needs review") because a `title` alone is not read reliably by screen readers.
+  - **Card layout:** every card now has the same shape: figure(s), then an optional note line (such as "not spending"), then a row count line. The note and the row count are separate lines. Before, they shared one line ("not spending · 1 row").
+  - **"Dimmed" means** opacity 0.55, applied when the row count behind the card is 0. This applies to all eight cards, not only Transfers and Unreviewed.
+  - **Rows fixed by hand** still show their number (100%), since only `needs_review` rows were asked about.
+- **Unsure about / please check:**
+  - **Contrast:** at opacity 0.55 the muted note text on a dimmed card is low contrast. That is the point of dimming, but check it is still readable in the light and dark themes. I did not look at the page.
+  - The unit tests check classes and structure (separate elements, note after the figures), not how it looks on screen.
+  - **Tests:** 53 frontend tests pass (3 more than before), build and lint clean.
+- **Developer review:** These three fixes were my calls, made after looking at the page.
+- **Tokens:** Input (uncached): 8 | Cache write: 6,738 | Cache read: 1,176,255 | Output: 6,637 | Model: Sonnet 5.5
+
+### 2026-10-26 18:42 — Check the log and DESIGN.md against the frontend
+- **Asked:** Check that the log and DESIGN.md match the frontend.
+- **Generated/changed:** `DESIGN.md` (status line, new section 10 "Frontend", section 3 and 5 and 7 wording, limits and next steps), `docs/ai-usage/log.md` (this entry only).
+- **Assumptions I made:**
+  - **Log:** I read the frontend entries against the code (files, the 50 and then 53 test counts, filters as `aria-pressed` buttons, dimming, the confidence dash) and found nothing to correct. I did not edit earlier entries.
+  - **DESIGN.md was stale** in four places: the status line and "what I'd build next" still said the review screen was to do, the pipeline's Review stage pointed nowhere, and section 5 said the UI shows the rule id (it shows only the reason). I fixed those and added a Frontend section describing the UI as built.
+  - I inserted the new section as number 10, so the old sections 10 and 11 are now 11 and 12. Earlier log entries that mention "section 10" or "section 11" refer to the old numbering.
+- **Unsure about / please check:**
+  - I checked the text against the code by reading it and running the tests, not by looking at the page. The statements about colour, dimming and layout rest on the CSS and test assertions.
+  - DESIGN.md now says the frontend has not been checked by eye in a browser. Change that line once you have.
+- **Developer review:** Mechanical check. Nothing of mine to add beyond the points the entry already flags under "Unsure about".
+- **Tokens:** Input (uncached): 12 | Cache write: 10,054 | Cache read: 2,003,652 | Output: 7,571 | Model: Sonnet 5.5
+
+### 2026-10-26 18:54 — Full verification before submission (read-only)
+- **Asked:** Check the whole app before submission without changing code: automated checks, a fresh-clone run, an end-to-end scenario through the Vite proxy, a browser check, a TASK.md requirements audit, repo hygiene and a code quality review.
+- **Generated/changed:** only this log entry. Everything else ran against a temporary clone in `/tmp/fresh-check` (deleted afterwards) and scripts in the session scratchpad. No git command other than read-only ones was run in the repo.
+- **Assumptions I made:**
+  - **Clone limits:** a clone contains only committed files, so `frontend/` (untracked) was missing from it. To keep going, I copied the working-tree `frontend/` (without `node_modules` and `dist`) into the temp clone and treated it as "the frontend once committed". Backend, `sample_data` and docs were the committed versions.
+  - **Browser check:** I drove the Brave browser already installed on this machine through its DevTools protocol, with a small Node script outside the repo, and took screenshots into the scratchpad. Nothing was added to the project.
+  - **Large-file test:** I uploaded a generated 4.67 MB file (96,565 rows) to the temp backend and loaded it in the page to see how it behaves.
+  - **Local database:** `backend/data/app.db` in the real repo existed before I started (created 18:36, last changed 18:42, two `bank_a_card.csv` uploads), so it came from the developer's own use. It is git-ignored and I did not touch it.
+- **Unsure about / please check:**
+  - **Result:** all automated checks pass (backend 373 tests, ruff clean; frontend 53 tests, build and lint clean) and 30 of 30 end-to-end checks pass, but the submission is **not ready**: see the blockers in the report (frontend, DESIGN.md and this log are not committed; `README.md` is still the fork guide; `AI_USAGE.md` is missing).
+  - **Bug found in my own earlier work:** the page scrolls sideways on narrow windows. The cause is the visually hidden text I added in the table. Not fixed, as instructed.
+  - **Earlier log wording still present:** the 14:47 and 14:52 reviews claim checks that had no code behind them yet, the 15:31 review says "Fixed" for a bug the AI found, and the header says the AI never fills those fields, which is no longer true. Eight of the newest entries have a blank Developer review and Tokens.
+  - **Limits of this check:** I did not check the page in other browsers or with a screen reader, did not run on Windows or macOS, and could not see GitHub, so I cannot say whether a pull request exists.
+- **Developer review:** The check found uncommitted frontend files, a missing README.md and AI_USAGE.md, and a narrow-screen scroll bug caused by Claude's own hidden text.
+- **Tokens:** Input (uncached): 68 | Cache write: 58,803 | Cache read: 13,490,026 | Output: 44,487 | Model: Sonnet 5.5
+
+### 2026-10-26 19:02 — Narrow-screen fix, error boundary, CI workflow and README
+- **Asked:** (1) fix the sideways scroll with `position: relative` on `.table-wrap`; (2) add a React error boundary with one test; (3) add a GitHub Actions workflow for the backend and frontend; (4) move the fork guide to `docs/SUBMISSION_GUIDE.md` unchanged; (5) write a new `README.md` from the contents list in the verification report; (6) log it.
+- **Generated/changed:** `frontend/src/index.css`, `frontend/src/components/ErrorBoundary.tsx` and its test, `frontend/src/main.tsx`, `.github/workflows/ci.yml`, `docs/SUBMISSION_GUIDE.md` (moved), `README.md` (new), `docs/ai-usage/log.md`.
+- **Assumptions I made:**
+  - **CSS fix:** confirmed in a real browser against the dev server: at a 375 px window the page no longer scrolls sideways (it did by 939 px before). It also holds at 414, 768, 1024 and 1280 px, with the editor open, and on the statement that has parse errors.
+  - **Error boundary:** it wraps `App` in `main.tsx` and shows "Something went wrong — reload the page." with a Reload button. It only catches render errors, not errors in event handlers or in `fetch`, which the app already reports itself.
+  - **CI:** I used the current major versions found with `git ls-remote`: `actions/checkout@v7`, `actions/setup-node@v7`, `astral-sh/setup-uv@v7`. I added npm and uv caching, `permissions: contents: read`, and a job name for each job. The commands are exactly the ones listed. I checked the file is valid YAML with the right triggers and steps, but **I could not run it**: GitHub Actions has not run this workflow.
+  - **README move:** a plain `mv`, not `git mv`, and the file is byte-for-byte identical to the committed one (checked).
+  - **README:** I did not copy the report's list word for word. I tested what it states: the example rule loads and decides correctly, the configuration table matches the real defaults, `/docs` returns 200, and the relative links resolve except `AI_USAGE.md`. The CI badge points at the workflow on the fork (`ahmeddawood9/savvpro-test-statement-categorizer`, branch `candidate-ahmeddawood9`); it will show "no status" until the workflow has run there.
+  - **Example rule in README:** I first used the Figma rule, which already exists in `rules.yaml` (copying it would give a duplicate id error), so I used a new `linear` rule and tested it.
+- **Unsure about / please check:**
+  - **A second, smaller overflow remains at 320 px:** the Upload panel is 340 px wide in a 305 px viewport because the file input will not shrink. Not requested, not fixed.
+  - **CI has not run.** The workflow depends on `frontend/package-lock.json` and `frontend/` being committed (both are untracked right now) and on the workflow file reaching the fork.
+  - **`AI_USAGE.md` does not exist yet**, so the README link to it is broken until it is written.
+  - **DESIGN.md is slightly stale again:** it still says the narrow layout is unchecked and lists the README as a next step.
+  - **README accuracy:** I tested its commands piece by piece (backend start, `/health`, frontend start, tests) but did not do one clean run from a fresh clone after writing it.
+  - **Tests:** 54 frontend tests (one new) and 373 backend tests pass; build, lint and ruff clean.
+- **Developer review:** I asked for six changes: the position: relative fix for the sideways scroll, a React error boundary with one test, a GitHub Actions workflow, moving the fork guide to docs/SUBMISSION_GUIDE.md, a new README built from the report's contents list, and a log entry. The scroll fix worked in a real browser (375 px no longer scrolls sideways), but a smaller overflow at 320 px is still there. Claude's first README example rule (Figma) already existed and would have caused a duplicate-id error, so it was replaced with a new linear rule that loads. The README link to AI_USAGE.md is broken because that file doesn't exist yet. The CI workflow has not been run, and it depends on frontend/ and its lockfile being committed (they are untracked). Still open: DESIGN.md is slightly stale again, and I haven't checked the README commands from a fresh clone.
+- **Tokens:** Input (uncached): 30 | Cache write: 24,426 | Cache read: 6,753,148 | Output: 21,026 | Model: Sonnet 5.5
+
+### 2026-10-26 19:12 — Fill the last measured token counts and list blank reviews
+- **Asked:** Fill the remaining Tokens fields from this session, and say which Developer review fields are still missing and remind what was done there.
+- **Generated/changed:** `docs/ai-usage/log.md` (nine Tokens lines, this entry). No Developer review text was written.
+- **Assumptions I made:**
+  - **Same method as before:** summed the `usage` fields in the session transcript, counting each model request once, and matched each entry to the prompt that produced it. All nine ran on Sonnet 5.5.
+  - **The verification entry (18:54) adds up several turns.** The screenshots I viewed appear in the transcript as extra injected messages after the prompt, and their model requests belong to the same task.
+  - **Left blank on purpose:** the Developer review of the 19:02 entry. It is only the developer's to write, and I gave a reminder of what happened instead.
+- **Unsure about / please check:**
+  - **Not compared with a screenshot:** these are the transcript's recorded figures, not `/cost`.
+  - **Turns with no entry:** the "write proper commits", "I don't want to commit the log and design now", "fill the develop review, assume it's me" and "check the log" turns have no entry, so their tokens are in no entry.
+  - **Older wording still to fix:** the 14:47 and 14:52 reviews and the "Fixed" in the 15:31 review (see the previous check), and the header line saying the AI never fills those fields.
+- **Developer review:** Mechanical task. Nothing of mine to add beyond the points the entry already flags under "Unsure about".
+- **Tokens:** Input (uncached): 10 | Cache write: 6,454 | Cache read: 2,024,995 | Output: 5,958 | Model: Sonnet 5.5
+
+### 2026-10-26 19:37 — Bring DESIGN.md in line with the code and write AI_USAGE.md
+- **Asked:** Update DESIGN.md to the code as it is now (keeping the existing structure and wording where still accurate), including the concrete data traps behind the rule order, the 0.8 threshold and why, the messy-data table linked to tests, known limits and next steps. Then write `AI_USAGE.md` at the repo root using only facts from this log. Log it.
+- **Generated/changed:** `DESIGN.md`, `AI_USAGE.md` (new), `docs/ai-usage/log.md`.
+- **Assumptions I made:**
+  - **DESIGN.md:** endpoints, per-currency totals, Personal excluded, refunds shown separately and review rows outside totals were already accurate, so I did not change them. I changed: the status line (CI exists, the page was checked in a headless browser); section 4 (each stage now has the sample row that justifies it, with row numbers and rule ids); section 5 (why a threshold, why 0.8); section 6 (seven more cases, each with a test name); section 10 (error boundary, layout check); section 11, split into trade-offs and known limits (from the verification report); section 12 (next steps).
+  - **Checked against the code:** I ran each trap row through the real classifier (rule id and result match what the text says), confirmed the sample row numbers, and confirmed that all 33 test names cited exist.
+  - **Why 0.8:** the log does not say how 0.8 was chosen. I explained it from the scores actually in use (0.95, 0.85, 0.75) and wrote that it is a judgement, not a tuned value.
+  - **AI_USAGE.md:** the token table and totals are parsed from this log by a script, not typed. Statements that come from the developer's own description and not from the log are marked "(developer-reported)".
+  - **rules.yaml:** AI_USAGE.md says Claude Code produced it from the developer's design. That comes from the developer, not from this log, and is marked "(developer-reported)".
+  - **Left out because the log does not contain it:** the "Pakistan Railways" example for RAILWAY (the log only says it matched any description with that word), the review-section detail for the refund placement (the log says "refund placement" and that refunds moved into the structural section), and any detail about the savings regex.
+  - **Screenshots:** none exist in `docs/ai-usage/`, so AI_USAGE.md says they are to be added instead of claiming they are there.
+- **Unsure about / please check:**
+  - **Claims that are yours, not the log's:** "I committed everything myself", that Claude Code is the only AI tool used, and who produced `rules.yaml` are in AI_USAGE.md because you said so.
+  - **Token figures** are the transcript's, not compared with `/cost`. The entry for this task has none yet, and neither do the turns without entries.
+  - **DESIGN.md numbers will go stale:** "33 of the 76 rules" and the large-file timings are measured today.
+- **Developer review:** Mechanical task. Nothing of mine to add beyond the points the entry already flags under "Unsure about".
+- **Tokens:** _(to be filled by Dawood from usage screenshot)_
+
+
+
+
+### 2026-10-26 20:42 — Correct how rules.yaml is described
+- **Asked:** Record that `rules.yaml` was produced by AI on the developer's design, keep the developer's review wording as it is, and remove any mention of other tools or chats.
+- **Generated/changed:** `AI_USAGE.md` (the tools line, the `rules.yaml` paragraph, the "what the AI produced" sentence, the wrong-things table, the paragraph on my own log), `docs/ai-usage/log.md` (the 17:00 provenance bullet, four bullets of the 19:37 entry, this entry).
+- **Assumptions I made:**
+  - **Source:** the developer's account. It is marked "(developer-reported)" in AI_USAGE.md. What this session's transcript shows is only my 15:57 version of the file and my three changes at 17:03, so AI_USAGE.md cites those two as the logged facts and attributes the rest to the developer's statement.
+  - The audit findings (income rules firing on card statements, the bare `REV`, `RAILWAY`) are back in the "Where AI got things wrong" table, because the rule set is now described as produced by Claude Code.
+  - I did not touch the log header, which says the review and token fields hold the developer's own wording.
+- **Unsure about / please check:**
+  - **The long rule set is not in this log's record.** Anyone comparing AI_USAGE.md with the log will find the 15:57 and 17:03 edits but not the writing of the full file. If it was produced in work that has no log entry or token figures, those are missing from the table.
+- **Developer review:** Mechanical task. Nothing of mine to add beyond the points the entry already flags under "Unsure about".
 - **Tokens:** _(to be filled by Dawood from usage screenshot)_
