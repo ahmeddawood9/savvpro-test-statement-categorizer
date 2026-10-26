@@ -287,3 +287,28 @@ def test_every_decision_has_a_reason() -> None:
 def test_classify_with_shipped_rules_runs() -> None:
     d = classify(make_row("ADOBE CREATIVE CLOUD SAN JOSE CA", "-59.99"))
     assert d.category == "Software & Subscriptions" and d.rule_id == "adobe"
+
+
+# ---------- shipped rules: regression tests for fixed rules.yaml problems ----------
+
+
+def test_card_credit_from_upwork_is_not_income() -> None:
+    d = classify(make_row("UPWORK HOURLY PAYMENT", "100", "card"))
+    assert d.category != "Income" and d.kind != "income"
+    assert (d.category, d.kind, d.rule_id) == ("Refund", "refund", "card_money_in")
+    # the same words on a bank statement are still client income
+    assert classify(make_row("UPWORK ESCROW INC", "100", "bank")).category == "Income"
+
+
+def test_bare_rev_does_not_make_a_credit_a_reversal() -> None:
+    d = classify(make_row("REV CHARGE ADJ", "100", "bank"))
+    assert d.rule_id != "reversal" and d.category != "Refund"
+    # real reversals are still caught
+    assert classify(make_row("REVERSAL PTCL BILL PAYMENT", "4299", "bank")).rule_id == "reversal"
+
+
+def test_railway_alone_is_not_hosting() -> None:
+    d = classify(make_row("PAKISTAN RAILWAY TICKET", "-1500", "card"))
+    assert d.category != "Hosting & Cloud" and d.rule_id != "cloud_providers"
+    # the hosting company is still recognised
+    assert classify(make_row("RAILWAY.APP", "-5", "card")).category == "Hosting & Cloud"

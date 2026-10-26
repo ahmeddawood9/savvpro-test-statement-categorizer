@@ -95,7 +95,6 @@ def test_table_formatting() -> None:
     assert table.splitlines()[0].startswith("where")
 
 
-@pytest.mark.xfail(reason="rules.yaml not yet complete", strict=False)
 def test_labels_match() -> None:
     mismatches = find_mismatches()
     table = format_table(mismatches)
